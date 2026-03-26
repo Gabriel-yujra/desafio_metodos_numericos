@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Solver LU 6x6 - Cholesky / Doolittle / Crout</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-soft: #111827;
+      --panel: #0b1120;
+      --panel-soft: #020617;
+      --accent: #22c55e;
+      --accent-soft: rgba(34,197,94,0.12);
+      --accent-strong: #16a34a;
+      --border: rgba(148,163,184,0.45);
+      --text: #e5e7eb;
+      --text-soft: #9ca3af;
+      --code-bg: #020617;
+      --danger: #f97373;
+      --radius: 10px;
+      --shadow: 0 24px 60px rgba(15,23,42,0.85);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, #020617 55%, #000 100%);
+      color: var(--text);
+      padding: 2rem 1rem 3rem;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .shell {
+      width: 100%;
+      max-width: 1120px;
+      background: linear-gradient(140deg, rgba(15,23,42,0.98), rgba(15,23,42,0.96));
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(148,163,184,0.3);
+      padding: 1.75rem 1.75rem 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .shell::before {
+      content: '';
+      position: absolute;
+      inset: -40%;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(45,212,191,0.04), transparent 55%),
+        radial-gradient(circle at 100% 0%, rgba(96,165,250,0.05), transparent 60%),
+        radial-gradient(circle at 50% 120%, rgba(34,197,94,0.18), transparent 55%);
+      pointer-events: none;
+      opacity: 0.95;
+    }
+    .shell-inner {
+      position: relative;
+      z-index: 1;
+    }
+    h1 {
+      margin: 0 0 0.35rem;
+      font-size: 1.45rem;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .badge {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      padding: 0.12rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.4);
+      color: var(--text-soft);
+      background: rgba(15,23,42,0.9);
+    }
+    p.lead {
+      margin: 0 0 1.25rem;
+      font-size: 0.9rem;
+      color: var(--text-soft);
+      max-width: 46rem;
+    }
+    fieldset {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem 1rem;
+      margin-bottom: 1rem;
+      background: radial-gradient(circle at top left, rgba(15,23,42,0.6), rgba(15,23,42,0.95));
+    }
+    legend {
+      padding: 0 0.55rem;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--text-soft);
+    }
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.85rem 1.25rem;
+      align-items: center;
+      font-size: 0.88rem;
+    }
+    label {
+      color: var(--text-soft);
+      font-size: 0.82rem;
+    }
+    input[type="number"],
+    select {
+      background: rgba(15,23,42,0.95);
+      color: var(--text);
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      padding: 0.25rem 0.65rem;
+      font-size: 0.86rem;
+      min-width: 3.5rem;
+      outline: none;
+    }
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    select {
+      padding-right: 1.6rem;
+    }
+    button {
+      border-radius: 999px;
+      border: none;
+      font-size: 0.86rem;
+      padding: 0.4rem 0.95rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #022c22;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(34,197,94,0.35);
+      transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, filter 0.12s ease-out;
+    }
+    button svg {
+      width: 14px;
+      height: 14px;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 40px rgba(34,197,94,0.45);
+      filter: brightness(1.03);
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text-soft);
+      border: 1px solid rgba(148,163,184,0.5);
+      box-shadow: none;
+    }
+    button.secondary:hover {
+      background: rgba(15,23,42,0.9);
+      transform: none;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .layout-main {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2.4fr);
+      gap: 1rem 1.25rem;
+      margin-top: 0.6rem;
+    }
+    @media (max-width: 920px) {
+      .layout-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .matrix-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .panel {
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: radial-gradient(circle at top left, rgba(15,23,42,0.85), rgba(15,23,42,0.98));
+      padding: 0.8rem 0.9rem 0.9rem;
+    }
+    .panel-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--text-soft);
+      margin-bottom: 0.4rem;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-top: 0.15rem;
+    }
+    th, td {
+      border: 1px solid rgba(30,64,175,0.7);
+      padding: 0.16rem;
+      text-align: center;
+      font-size: 0.78rem;
+      background: rgba(15,23,42,0.94);
+      color: var(--text);
+    }
+    th {
+      background: linear-gradient(135deg, rgba(30,64,175,0.9), rgba(15,23,42,0.95));
+      color: #cbd5f5;
+      font-weight: 500;
+    }
+    td input[type="number"] {
+      width: 3.4rem;
+      background: rgba(15,23,42,0.98);
+      border-radius: 6px;
+      border-color: rgba(148,163,184,0.6);
+      text-align: right;
+    }
+
+    .output-area {
+      white-space: pre;
+      font-family: "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      color: #e5e7eb;
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid rgba(30,64,175,0.7);
+      overflow-x: auto;
+      max-height: 260px;
+    }
+    .output-area + .output-area {
+      margin-top: 0.55rem;
+    }
+    .output-area span.err {
+      color: var(--danger);
+    }
+    .output-area span.ok {
+      color: #a7f3d0;
+    }
+
+    .section-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text-soft);
+      margin-bottom: 0.35rem;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+      align-items: baseline;
+      margin-top: 0.3rem;
+    }
+    .meta-row small {
+      font-size: 0.72rem;
+      color: var(--text-soft);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="shell-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+        <div>
+          <h1>
+            Solver LU 6&times;6
+            <span class="badge">Cholesky · Doolittle · Crout</span>
+          </h1>
+          <p class="lead">
+            Ingresa la matriz A y el vector b para el sistema Ax = b, escoge el m&eacute;todo de factorizaci&oacute;n
+            y obt&eacute;n L, U, el procedimiento num&eacute;rico detallado y un script listo para Octave.
+          </p>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend>Configuraci&oacute;n del problema</legend>
+        <div class="controls-row">
+          <div style="display:flex;align-items:center;gap:0.45rem;">
+            <label for="size">Tama&ntilde;o n (&le; 6):</label>
+            <input id="size" type="number" min="1" max="6" value="3" />
+          </div>
+          <div style="display:flex;align-items:center;gap:0.45rem;">
+            <label for="method">M&eacute;todo:</label>
+            <select id="method">
+              <option value="doolittle">Doolittle (L unidad diagonal)</option>
+              <option value="crout">Crout (U unidad diagonal)</option>
+              <option value="cholesky">Cholesky (A sim&eacute;trica definida positiva)</option>
+            </select>
+          </div>
+          <button id="fillExample" type="button" class="secondary" title="Carga un ejemplo cl&aacute;sico 3x3">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0115-6.708"/><path d="M3 5v7h7"/><path d="M21 12a9 9 0 01-15 6.708"/><path d="M21 19v-7h-7"/></svg>
+            Ejemplo 3x3
+          </button>
+        </div>
+      </fieldset>
+
+      <div class="layout-main">
+        <div>
+          <div class="panel">
+            <div class="panel-title">Entrada: matriz A y vector b</div>
+            <div class="matrix-wrapper">
+              <div>
+                <div class="section-label">Matriz A</div>
+                <table id="matrixA"></table>
+              </div>
+              <div>
+                <div class="section-label">Vector b</div>
+                <table id="vectorB"></table>
+              </div>
+            </div>
+            <div class="controls-row" style="margin-top:0.75rem;justify-content:flex-start;">
+              <button id="solveBtn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+                Resolver sistema
+              </button>
+              <button id="clearBtn" type="button" class="secondary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6v12"/><path d="M16 6v12"/><path d="M10 6l1-3h2l1 3"/></svg>
+                Limpiar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="panel" style="margin-bottom:0.75rem;">
+            <div class="panel-title">Resumen num&eacute;rico</div>
+            <div id="output" class="output-area">Listo. Ingresa datos y pulsa "Resolver sistema".</div>
+            <div class="meta-row">
+              <small id="metaDims">&nbsp;</small>
+              <small id="metaCond">&nbsp;</small>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-title">Procedimiento y c&oacute;digo Octave</div>
+            <div class="section-label">Procedimiento paso a paso</div>
+            <div id="steps" class="output-area">Aqu&iacute; se mostrar&aacute;n los pasos de la factorizaci&oacute;n y las sustituciones.</div>
+            <div class="section-label" style="margin-top:0.7rem;">Script sugerido para Octave</div>
+            <div id="octave" class="output-area">Tras resolver se generar&aacute; un script autocontenido en Octave para este sistema.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const sizeInput   = document.getElementById('size');
+  const methodSelect = document.getElementById('method');
+  const matrixATable = document.getElementById('matrixA');
+  const vectorBTable = document.getElementById('vectorB');
+  const outputEl     = document.getElementById('output');
+  const stepsEl      = document.getElementById('steps');
+  const octaveEl     = document.getElementById('octave');
+  const metaDimsEl   = document.getElementById('metaDims');
+  const metaCondEl   = document.getElementById('metaCond');
+
+  function buildTables(n) {
+    matrixATable.innerHTML = '';
+    vectorBTable.innerHTML = '';
+
+    const headRow = document.createElement('tr');
+    const emptyTh = document.createElement('th');
+    headRow.appendChild(emptyTh);
+    for (let j = 0; j < n; j++) {
+      const th = document.createElement('th');
+      th.textContent = 'j=' + (j+1);
+      headRow.appendChild(th);
+    }
+    matrixATable.appendChild(headRow);
+
+    for (let i = 0; i < n; i++) {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th');
+      th.textContent = 'i=' + (i+1);
+      tr.appendChild(th);
+      for (let j = 0; j < n; j++) {
+        const td = document.createElement('td');
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.step = 'any';
+        inp.id = `a_${i}_${j}`;
+        td.appendChild(inp);
+        tr.appendChild(td);
+      }
+      matrixATable.appendChild(tr);
+    }
+
+    const headB = document.createElement('tr');
+    const thb1 = document.createElement('th'); thb1.textContent = 'i';
+    const thb2 = document.createElement('th'); thb2.textContent = 'b_i';
+    headB.appendChild(thb1); headB.appendChild(thb2);
+    vectorBTable.appendChild(headB);
+
+    for (let i = 0; i < n; i++) {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th'); th.textContent = 'i=' + (i+1);
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.step = 'any'; inp.id = `b_${i}`;
+      td.appendChild(inp);
+      tr.appendChild(th); tr.appendChild(td);
+      vectorBTable.appendChild(tr);
+    }
+
+    metaDimsEl.textContent = `Dimensiones actuales: ${n}×${n}`;
+  }
+
+  function getSize() {
+    let n = parseInt(sizeInput.value, 10);
+    if (!Number.isFinite(n) || n < 1) n = 1;
+    if (n > 6) n = 6;
+    sizeInput.value = n;
+    return n;
+  }
+
+  sizeInput.addEventListener('change', () => buildTables(getSize()));
+  buildTables(getSize());
+
+  function readSystem() {
+    const n = getSize();
+    const A = Array.from({length: n}, () => Array(n).fill(0));
+    const b = Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        const v = parseFloat(document.getElementById(`a_${i}_${j}`).value || '0');
+        A[i][j] = v;
+      }
+      b[i] = parseFloat(document.getElementById(`b_${i}`).value || '0');
+    }
+    return {n, A, b};
+  }
+
+  function zeros(n) { return Array.from({length:n}, () => Array(n).fill(0)); }
+
+  function formatMatrix(M) {
+    return M.map(row => row.map(v => {
+      const val = Math.abs(v) < 1e-12 ? 0 : v;
+      return val.toFixed(6).padStart(11);
+    }).join(' ')).join('\n');
+  }
+
+  function formatVector(v) {
+    return v.map(val => {
+      const value = Math.abs(val) < 1e-12 ? 0 : val;
+      return value.toFixed(6).padStart(11);
+    }).join(' ');
+  }
+
+  function doolittle(A) {
+    const n = A.length;
+    const L = zeros(n);
+    const U = zeros(n);
+    let log = 'Descomposici\u00f3n LU por Doolittle (L con diagonal de 1)\n';
+    for (let i = 0; i < n; i++) L[i][i] = 1;
+
+    for (let k = 0; k < n; k++) {
+      log += `\nEtapa k = ${k+1}\n`;
+      for (let j = k; j < n; j++) {
+        let sum = 0;
+        for (let s = 0; s < k; s++) sum += L[k][s] * U[s][j];
+        U[k][j] = A[k][j] - sum;
+        log += `  U(${k+1},${j+1}) = A(${k+1},${j+1}) - \\sum_{s=1}^{${k}} L(${k+1},s)U(s,${j+1}) = ${U[k][j].toFixed(6)}\n`;
+      }
+      if (Math.abs(U[k][k]) < 1e-14) throw new Error('Pivote cero en Doolittle (fila ' + (k+1) + ').');
+      for (let i = k+1; i < n; i++) {
+        let sum = 0;
+        for (let s = 0; s < k; s++) sum += L[i][s] * U[s][k];
+        L[i][k] = (A[i][k] - sum) / U[k][k];
+        log += `  L(${i+1},${k+1}) = [A(${i+1},${k+1}) - \\sum_{s=1}^{${k}} L(${i+1},s)U(s,${k+1})]/U(${k+1},${k+1}) = ${L[i][k].toFixed(6)}\n`;
+      }
+    }
+    return {L, U, log};
+  }
+
+  function crout(A) {
+    const n = A.length;
+    const L = zeros(n);
+    const U = zeros(n);
+    let log = 'Descomposici\u00f3n LU por Crout (U con diagonal de 1)\n';
+    for (let i = 0; i < n; i++) U[i][i] = 1;
+
+    for (let j = 0; j < n; j++) {
+      log += `\nColumna j = ${j+1}\n`;
+      for (let i = j; i < n; i++) {
+        let sum = 0;
+        for (let k = 0; k < j; k++) sum += L[i][k] * U[k][j];
+        L[i][j] = A[i][j] - sum;
+        log += `  L(${i+1},${j+1}) = A(${i+1},${j+1}) - \\sum_{k=1}^{${j}} L(${i+1},k)U(k,${j+1}) = ${L[i][j].toFixed(6)}\n`;
+      }
+      if (Math.abs(L[j][j]) < 1e-14) throw new Error('Pivote cero en Crout (fila ' + (j+1) + ').');
+      for (let k = j+1; k < n; k++) {
+        let sum = 0;
+        for (let i = 0; i < j; i++) sum += L[j][i] * U[i][k];
+        U[j][k] = (A[j][k] - sum) / L[j][j];
+        log += `  U(${j+1},${k+1}) = [A(${j+1},${k+1}) - \\sum_{i=1}^{${j}} L(${j+1},i)U(i,${k+1})]/L(${j+1},${j+1}) = ${U[j][k].toFixed(6)}\n`;
+      }
+    }
+    return {L, U, log};
+  }
+
+  function cholesky(A) {
+    const n = A.length;
+    const L = zeros(n);
+    let log = 'Descomposici\u00f3n de Cholesky (A = LL^T)\n';
+    for (let i = 0; i < n; i++) {
+      log += `\nFila i = ${i+1}\n`;
+      for (let j = 0; j <= i; j++) {
+        let sum = 0;
+        for (let k = 0; k < j; k++) sum += L[i][k] * L[j][k];
+        if (i === j) {
+          const val = A[i][i] - sum;
+          if (val <= 0) throw new Error('A no es sim\u00e9trica definida positiva (Cholesky falla en i=' + (i+1) + ').');
+          L[i][j] = Math.sqrt(val);
+          log += `  L(${i+1},${j+1}) = sqrt(A(${i+1},${i+1}) - \\sum_{k=1}^{${j}} L(${i+1},k)^2) = ${L[i][j].toFixed(6)}\n`;
+        } else {
+          L[i][j] = (A[i][j] - sum) / L[j][j];
+          log += `  L(${i+1},${j+1}) = [A(${i+1},${j+1}) - \\sum_{k=1}^{${j}} L(${i+1},k)L(${j+1},k)]/L(${j+1},${j+1}) = ${L[i][j].toFixed(6)}\n`;
+        }
+      }
+    }
+    const U = zeros(n);
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        U[i][j] = L[j][i];
+      }
+    }
+    log += '\nU se obtiene como U = (L)^T.\n';
+    return {L, U, log};
+  }
+
+  function forwardSub(L, b) {
+    const n = L.length;
+    const y = Array(n).fill(0);
+    let log = '\nSustituci\u00f3n hacia adelante (Ly = b)\n';
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = 0; j < i; j++) sum += L[i][j] * y[j];
+      if (Math.abs(L[i][i]) < 1e-14) throw new Error('Pivote cero en sustituci\u00f3n hacia adelante (fila ' + (i+1) + ').');
+      y[i] = (b[i] - sum) / L[i][i];
+      log += `  y(${i+1}) = [b(${i+1}) - \\sum_{j=1}^{${i}} L(${i+1},j)y(j)]/L(${i+1},${i+1}) = ${y[i].toFixed(6)}\n`;
+    }
+    return {y, log};
+  }
+
+  function backSub(U, y) {
+    const n = U.length;
+    const x = Array(n).fill(0);
+    let log = '\nSustituci\u00f3n hacia atr\u00e1s (Ux = y)\n';
+    for (let i = n-1; i >= 0; i--) {
+      let sum = 0;
+      for (let j = i+1; j < n; j++) sum += U[i][j] * x[j];
+      if (Math.abs(U[i][i]) < 1e-14) throw new Error('Pivote cero en sustituci\u00f3n hacia atr\u00e1s (fila ' + (i+1) + ').');
+      x[i] = (y[i] - sum) / U[i][i];
+      log += `  x(${i+1}) = [y(${i+1}) - \\sum_{j=${i+2}}^{n} U(${i+1},j)x(j)]/U(${i+1},${i+1}) = ${x[i].toFixed(6)}\n`;
+    }
+    return {x, log};
+  }
+
+  function generateOctaveCode(A, b, method) {
+    const n = A.length;
+    let code = '% Script generado para GNU Octave\n';
+    code += '% Sistema Ax = b y resoluci\u00f3n mediante factorizaci\u00f3n LU (' + method.toUpperCase() + ')\n\n';
+    code += 'A = [\n';
+    for (let i = 0; i < n; i++) {
+      code += '  ' + A[i].map(v => (Math.abs(v) < 1e-12 ? 0 : v)).join(' ') + ';\n';
+    }
+    code += '];\n';
+    code += 'b = [' + b.map(v => (Math.abs(v) < 1e-12 ? 0 : v)).join(' ') + "]';\n";
+    code += 'n = rows(A);\n\n';
+
+    if (method === 'doolittle') {
+      code += '% --- Doolittle: L con diagonal unitaria ---\n';
+      code += 'L = eye(n); U = zeros(n);\n';
+      code += 'for k = 1:n\n';
+      code += '  for j = k:n\n';
+      code += '    s = 0;\n';
+      code += '    for p = 1:k-1\n';
+      code += '      s = s + L(k,p)*U(p,j);\n';
+      code += '    endfor\n';
+      code += '    U(k,j) = A(k,j) - s;\n';
+      code += '  endfor\n';
+      code += '  for i = k+1:n\n';
+      code += '    s = 0;\n';
+      code += '    for p = 1:k-1\n';
+      code += '      s = s + L(i,p)*U(p,k);\n';
+      code += '    endfor\n';
+      code += '    L(i,k) = (A(i,k) - s)/U(k,k);\n';
+      code += '  endfor\n';
+      code += 'endfor\n\n';
+    } else if (method === 'crout') {
+      code += '% --- Crout: U con diagonal unitaria ---\n';
+      code += 'L = zeros(n); U = eye(n);\n';
+      code += 'for j = 1:n\n';
+      code += '  for i = j:n\n';
+      code += '    s = 0;\n';
+      code += '    for k = 1:j-1\n';
+      code += '      s = s + L(i,k)*U(k,j);\n';
+      code += '    endfor\n';
+      code += '    L(i,j) = A(i,j) - s;\n';
+      code += '  endfor\n';
+      code += '  for k = j+1:n\n';
+      code += '    s = 0;\n';
+      code += '    for i = 1:j-1\n';
+      code += '      s = s + L(j,i)*U(i,k);\n';
+      code += '    endfor\n';
+      code += '    U(j,k) = (A(j,k) - s)/L(j,j);\n';
+      code += '  endfor\n';
+      code += 'endfor\n\n';
+    } else if (method === 'cholesky') {
+      code += '% --- Cholesky: A simetrica definida positiva, A = L*L^T ---\n';
+      code += 'L = zeros(n);\n';
+      code += 'for i = 1:n\n';
+      code += '  for j = 1:i\n';
+      code += '    s = 0;\n';
+      code += '    for k = 1:j-1\n';
+      code += '      s = s + L(i,k)*L(j,k);\n';
+      code += '    endfor\n';
+      code += '    if i == j\n';
+      code += '      L(i,j) = sqrt(A(i,i) - s);\n';
+      code += '    else\n';
+      code += '      L(i,j) = (A(i,j) - s)/L(j,j);\n';
+      code += '    endif\n';
+      code += '  endfor\n';
+      code += 'endfor\n';
+      code += 'U = transpose(L);\n\n';
+    }
+
+    code += '% Sustitucion hacia adelante Ly = b\n';
+    code += 'y = zeros(n,1);\n';
+    code += 'for i = 1:n\n';
+    code += '  s = 0;\n';
+    code += '  for j = 1:i-1\n';
+    code += '    s = s + L(i,j)*y(j);\n';
+    code += '  endfor\n';
+    code += '  y(i) = (b(i) - s)/L(i,i);\n';
+    code += 'endfor\n\n';
+
+    code += '% Sustitucion hacia atras Ux = y\n';
+    code += 'x = zeros(n,1);\n';
+    code += 'for i = n:-1:1\n';
+    code += '  s = 0;\n';
+    code += '  for j = i+1:n\n';
+    code += '    s = s + U(i,j)*x(j);\n';
+    code += '  endfor\n';
+    code += '  x(i) = (y(i) - s)/U(i,i);\n';
+    code += 'endfor\n\n';
+
+    code += 'disp("L = "); disp(L);\n';
+    code += 'disp("U = "); disp(U);\n';
+    code += 'disp("Solucion x = "); disp(x);\n';
+
+    return code;
+  }
+
+  document.getElementById('solveBtn').addEventListener('click', () => {
+    try {
+      const {n, A, b} = readSystem();
+      const method = methodSelect.value;
+      let LU;
+      if (method === 'doolittle') LU = doolittle(A);
+      else if (method === 'crout') LU = crout(A);
+      else if (method === 'cholesky') LU = cholesky(A);
+
+      const {L, U, log} = LU;
+      const fwd = forwardSub(L, b);
+      const bwd = backSub(U, fwd.y);
+      const y = fwd.y;
+      const x = bwd.x;
+
+      let summary = '';
+      summary += 'Metodo seleccionado: ' + method.toUpperCase() + '\n';
+      summary += '\nMatriz L (aprox):\n' + formatMatrix(L) + '\n';
+      summary += '\nMatriz U (aprox):\n' + formatMatrix(U) + '\n';
+      summary += '\nVector y (Ly = b):\n' + formatVector(y) + '\n';
+      summary += '\nSolucion x (Ux = y):\n' + formatVector(x) + '\n';
+      outputEl.textContent = summary;
+
+      stepsEl.textContent = log + fwd.log + bwd.log;
+      octaveEl.textContent = generateOctaveCode(A, b, method);
+
+      metaCondEl.textContent = `Sistema resuelto para n = ${n}`;
+    } catch (err) {
+      outputEl.innerHTML = '<span class="err">Error: ' + err.message + '</span>';
+      stepsEl.innerHTML = '<span class="err">No se pudo completar el procedimiento: ' + err.message + '</span>';
+      octaveEl.textContent = '---';
+      metaCondEl.textContent = '';
+    }
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    const {n} = readSystem();
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        document.getElementById(`a_${i}_${j}`).value = '';
+      }
+      document.getElementById(`b_${i}`).value = '';
+    }
+    outputEl.textContent = 'Listo. Ingresa datos y pulsa "Resolver sistema".';
+    stepsEl.textContent = 'Aqu\u00ed se mostrar\u00e1n los pasos de la factorizaci\u00f3n y las sustituciones.';
+    octaveEl.textContent = 'Tras resolver se generar\u00e1 un script autocontenido en Octave para este sistema.';
+    metaCondEl.textContent = '';
+  });
+
+  document.getElementById('fillExample').addEventListener('click', () => {
+    sizeInput.value = 3;
+    buildTables(3);
+    const exA = [
+      [10, 2, -1],
+      [-3, -6, 2],
+      [1, 1, 5]
+    ];
+    const exb = [27, -61.5, -21.5];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) {
+        document.getElementById(`a_${i}_${j}`).value = exA[i][j];
+      }
+      document.getElementById(`b_${i}`).value = exb[i];
+    }
+    outputEl.textContent = 'Ejemplo 3x3 cargado. Ahora pulsa "Resolver sistema".';
+    stepsEl.textContent = 'Al resolver se mostrar\u00e1n aqu\u00ed las etapas de Doolittle/Crout/Cholesky.';
+    octaveEl.textContent = 'Al resolver se generar\u00e1 el script de Octave correspondiente a este ejemplo.';
+    metaCondEl.textContent = 'Ejemplo 3x3 (n = 3).';
+  });
+})();
+</script>
+
+</body>
+</html>
